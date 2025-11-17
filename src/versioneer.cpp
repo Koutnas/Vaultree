@@ -1,16 +1,16 @@
-#include "Versioneer.hpp"
+#include "versioneer.hpp"
 
 
-Versioneer::Versioneer(std::string backup_root){
+versioneer::versioneer(std::string backup_root){
     this->backup_root = backup_root;
 }
 
-Versioneer::Versioneer(std::string backup_root,std::unordered_set<std::string> skip_dirs){
+versioneer::versioneer(std::string backup_root,std::unordered_set<std::string> skip_dirs){
     this->backup_root = backup_root;
     this->skip_dirs = skip_dirs;
 }
 
-void Versioneer::print_changes(std::unordered_map<int,int>& changes){
+void versioneer::print_changes(std::unordered_map<int,int>& changes){
         if(changes.empty()){
             std::cout<<"No files modified"<<std::endl;
         }else{
@@ -30,7 +30,7 @@ void Versioneer::print_changes(std::unordered_map<int,int>& changes){
         }
     }
 
-void Versioneer::print_node(tree_node node) { //used in early stages for debugging
+void versioneer::print_node(tree_node node) { //used in early stages for debugging
     std::cout << "id: " << node.id << std::endl;
     std::cout << "parent id: " << node.parent_id << std::endl;
     std::cout << "path: " << node.path << std::endl;
@@ -41,7 +41,7 @@ void Versioneer::print_node(tree_node node) { //used in early stages for debuggi
     std::cout << "===========================" << std::endl;
 }
 
-int Versioneer::iterator_to_id(std::string path,std::unordered_map<std::string,int>& cache){
+int versioneer::iterator_to_id(std::string path,std::unordered_map<std::string,int>& cache){
     auto it = cache.find(path);
     if (it != cache.end()) {
         return it->second;
@@ -50,7 +50,7 @@ int Versioneer::iterator_to_id(std::string path,std::unordered_map<std::string,i
     }
 }
 
-int Versioneer::fill_node(tree_node& node, std::string path, int scan_id, int parent_id, int id){
+int versioneer::fill_node(tree_node& node, std::string path, int scan_id, int parent_id, int id){
         node.id = id;
         node.parent_id = parent_id;
         node.path = path;
@@ -74,7 +74,7 @@ int Versioneer::fill_node(tree_node& node, std::string path, int scan_id, int pa
         return 1;
     }
 
-void Versioneer::check_file(tree_node& node,std::unordered_map<int,int>& changes){
+void versioneer::check_file(tree_node& node,std::unordered_map<int,int>& changes){
     if(node.id == -1){
         dbm.step_insert(node); //adds new node if node wasnt found
         changes.insert({node.id,ADDED});
@@ -85,7 +85,7 @@ void Versioneer::check_file(tree_node& node,std::unordered_map<int,int>& changes
     }
 }
 
-void Versioneer::get_filesystem_changes(){   
+void versioneer::get_filesystem_changes(){   
         //DB TRANSACTION BEGINNING
         int scan_id = dbm.get_scan_id();
         std::unordered_map<std::string,int> cache = dbm.get_index_map(scan_id);

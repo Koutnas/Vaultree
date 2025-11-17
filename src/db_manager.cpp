@@ -29,11 +29,6 @@ db_manager::db_manager(){
     sqlite3_prepare_v2(db, update_s, -1, &stmts.update_s, nullptr);
 }
 db_manager::~db_manager(){
-    sqlite3_finalize(stmts.update_s);
-    sqlite3_finalize(stmts.update);
-    sqlite3_finalize(stmts.select);
-    sqlite3_finalize(stmts.insertf);
-
     if(db){
         sqlite3_close(db);
         db = nullptr;

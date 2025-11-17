@@ -1,10 +1,10 @@
-#include "Versioneer.hpp"
+#include "versioneer.hpp"
 
 int main()
 {
         auto start = std::chrono::system_clock::now();
 
-        Versioneer vers = Versioneer("/home/ondra/test");
+        versioneer vers = versioneer("/home/ondra/test");
         vers.get_filesystem_changes();
 
 

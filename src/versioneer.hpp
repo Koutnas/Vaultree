@@ -7,7 +7,7 @@
 
 namespace fs = std::filesystem;
 
-class Versioneer{
+class versioneer{
 private:
     db_manager dbm = db_manager();
     std::string backup_root;
@@ -25,9 +25,9 @@ private:
 
 public:
 
-    Versioneer(std::string backup_root);
+    versioneer(std::string backup_root);
 
-    Versioneer(std::string backup_root,std::unordered_set<std::string> skip_dirs);
+    versioneer(std::string backup_root,std::unordered_set<std::string> skip_dirs);
 
     void get_filesystem_changes();
 };
