@@ -1,4 +1,5 @@
 #include "db_manager.hpp"
+#include "hasher.hpp"
 #include <unordered_set>
 #include <unordered_map>
 #include <filesystem>
@@ -9,6 +10,7 @@ namespace fs = std::filesystem;
 
 class versioneer{
 private:
+    Hasher hasher;
     db_manager dbm = db_manager();
     std::string backup_root;
     std::unordered_set<std::string> skip_dirs;

@@ -25,8 +25,10 @@ db_manager::db_manager(){
     sqlite3_prepare_v2(db, select, -1, &stmts.select, nullptr);
     const char* update =R"(UPDATE files SET size=?,mtm=?,hash=?,scan_id=? WHERE id=?)";
     sqlite3_prepare_v2(db, update, -1, &stmts.update, nullptr);
-    const char* update_s =R"(UPDATE files SET scan_id=? WHERE id=?)";
-    sqlite3_prepare_v2(db, update_s, -1, &stmts.update_s, nullptr);
+    const char* update_scan =R"(UPDATE files SET scan_id=? WHERE id=?)";
+    sqlite3_prepare_v2(db, update_scan, -1, &stmts.update_scan, nullptr);
+    const char* update_minor = R"(UPDATE files SET mtm=?,size=?,scan_id=? WHERE id=?)";
+    sqlite3_prepare_v2(db, update_minor, -1, &stmts.upadte_minor,nullptr);
 }
 db_manager::~db_manager(){
     if(db){
@@ -62,7 +64,7 @@ void db_manager::start_transaction(){
 }
 
 void db_manager::commit_transaction(){
-    sqlite3_finalize(stmts.update_s);
+    sqlite3_finalize(stmts.update_scan);
     sqlite3_finalize(stmts.update);
     sqlite3_finalize(stmts.select);
     sqlite3_finalize(stmts.insertf);
@@ -81,14 +83,6 @@ void db_manager::get_removed(std::unordered_map<int,int>& changes,int scan_id){
     sqlite3_finalize(stmt);
 }
 
-void db_manager::update_scan_id(tree_node& node){
-    sqlite3_bind_int(stmts.update_s,1,node.scan_id);
-    sqlite3_bind_int(stmts.update_s,2,node.id);
-
-    sqlite3_step(stmts.update_s);
-    sqlite3_reset(stmts.update_s);
-}
-
 void db_manager::step_insert(tree_node& node){
     sqlite3_bind_int(stmts.insertf, 1, node.parent_id);
     sqlite3_bind_text(stmts.insertf, 2, node.path.c_str(), -1, SQLITE_STATIC);
@@ -102,8 +96,25 @@ void db_manager::step_insert(tree_node& node){
     node.id = static_cast<int>(sqlite3_last_insert_rowid(db));
     sqlite3_reset(stmts.insertf);
 }
+void db_manager::update_scan_id(tree_node& node){
+    sqlite3_bind_int(stmts.update_scan,1,node.scan_id);
+    sqlite3_bind_int(stmts.update_scan,2,node.id);
 
-void db_manager::update_metadata(tree_node& node){
+    sqlite3_step(stmts.update_scan);
+    sqlite3_reset(stmts.update_scan);
+}
+
+void db_manager::update_mtm_size(tree_node& node){
+    sqlite3_bind_int64(stmts.upadte_minor,1,node.mtm);
+    sqlite3_bind_int(stmts.upadte_minor,2,node.size);
+    sqlite3_bind_int(stmts.upadte_minor,3,node.scan_id);
+    sqlite3_bind_int(stmts.upadte_minor,4,node.id);
+
+    sqlite3_step(stmts.upadte_minor);
+    sqlite3_reset(stmts.upadte_minor);
+}
+
+void db_manager::update_all(tree_node& node){
     sqlite3_bind_int(stmts.update,1,node.size);
     sqlite3_bind_int64(stmts.update,2,node.mtm);
     sqlite3_bind_text(stmts.update,3,node.hash.c_str(),-1,SQLITE_STATIC);
@@ -126,8 +137,11 @@ int db_manager::compare_metadata(tree_node& node){
         if(node.mtm == mtm && node.size == size){ //File unmodified
             update_scan_id(node);
             return 0;
+        }else if (node.hash == hash){ //File modified but hash checksout - unomodified
+            update_mtm_size(node);
+            return 0;
         }else{
-            update_metadata(node);
+            update_all(node);
             return 1;
         }
     }

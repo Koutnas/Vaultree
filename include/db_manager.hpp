@@ -28,7 +28,8 @@ public:
     sqlite3_stmt* insertf = nullptr;
     sqlite3_stmt* select = nullptr;
     sqlite3_stmt* update = nullptr;
-    sqlite3_stmt* update_s = nullptr;
+    sqlite3_stmt* update_scan = nullptr;
+    sqlite3_stmt* upadte_minor = nullptr;
     } stmts;
 
     db_manager();
@@ -45,9 +46,11 @@ public:
 
     void update_scan_id(tree_node& node);
 
-    void step_insert(tree_node& node);
+    void update_mtm_size(tree_node& node);
 
-    void update_metadata(tree_node& node);
+    void update_all(tree_node& node);
+
+    void step_insert(tree_node& node);
 
     int compare_metadata(tree_node& node);
 

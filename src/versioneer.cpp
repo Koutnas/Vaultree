@@ -37,6 +37,7 @@ void versioneer::print_node(tree_node node) { //used in early stages for debuggi
     std::cout << "is_dir: " << node.is_dir << std::endl;
     std::cout << "size: " << node.size<< std::endl;
     std::cout << "mtm: " << node.mtm << std::endl;
+    std::cout << "hash: " << node.hash << std::endl;
     std::cout << "scan_id: " << node.scan_id << std::endl;
     std::cout << "===========================" << std::endl;
 }
@@ -58,6 +59,7 @@ int versioneer::fill_node(tree_node& node, std::string path, int scan_id, int pa
         node.is_dir = fs::is_directory(node.path);
         if(!node.is_dir){
             try{
+            node.hash = hasher.compute_hash(node.path);
             node.size = fs::file_size(node.path);
             }catch(const fs::filesystem_error& e){
                 std::cerr <<" Cannot read file_size: " << e.what() << "\n";
@@ -68,7 +70,7 @@ int versioneer::fill_node(tree_node& node, std::string path, int scan_id, int pa
             auto ftime = fs::last_write_time(node.path);
             node.mtm = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(ftime));
         }catch(const fs::filesystem_error& e){
-            std::cerr << node.path <<" Cannot read file_size: " << e.what() << "\n";
+            std::cerr << node.path <<" Cannot read mtm: " << e.what() << "\n";
             return 0;
             }
         return 1;

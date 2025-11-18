@@ -3,25 +3,42 @@ project(vaultree LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON )
 # Find SQLite3
 find_package(SQLite3 REQUIRED)
 # Include headers in src/ or include/
-include_directories(src include)
+
+#blake3_sources
+add_library(blake3lib
+    third_party/blake3/blake3.c
+    third_party/blake3/blake3_portable.c
+    third_party/blake3/blake3_dispatch.c
+)
+target_compile_definitions( blake3lib PRIVATE
+    BLAKE3_NO_SSE2
+    BLAKE3_NO_SSE41
+    BLAKE3_NO_AVX2
+    BLAKE3_NO_AVX512
+)
+target_include_directories(blake3lib PUBLIC third_party/blake3)
 
 # DBManager library
 add_library(dbmanager
     src/db_manager.cpp
 )
-target_include_directories(dbmanager PRIVATE ${SQLite3_INCLUDE_DIRS})
-target_link_libraries(dbmanager PRIVATE ${SQLite3_LIBRARIES})
+target_link_libraries(dbmanager PRIVATE SQLite::SQLite3)
+target_include_directories(dbmanager PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # Versioneer depends on DBManager
 add_library(versioneer
+    src/hasher.cpp
     src/versioneer.cpp
 )
-target_link_libraries(versioneer PRIVATE dbmanager)
+target_link_libraries(versioneer PRIVATE dbmanager PUBLIC blake3lib)
+target_include_directories(versioneer PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
-# Main executable depends on Versioneer
+# Main executable
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(vaultree
     src/main.cpp
 )
