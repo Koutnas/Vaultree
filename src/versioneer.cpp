@@ -51,23 +51,30 @@ int versioneer::iterator_to_id(std::string path,std::unordered_map<std::string,i
     }
 }
 
-int versioneer::fill_node(tree_node& node, std::string path, int scan_id, int parent_id, int id){
-        node.id = id;
+int versioneer::fill_node(tree_node& node, int scan_id, int parent_id, std::unordered_map<std::string,int>& cache, auto& entry){
         node.parent_id = parent_id;
-        node.path = path;
+        try {                                                                   //Exists just because sometimes especially when browsing windows appdata this throws sys error.
+            node.path = entry.path().generic_string();
+            if (skip_dirs.contains(entry.path().filename().string())){ 
+                return 0;
+            } //Also nice to have if we have some folders we dont want to back-up
+        } catch (const std::system_error& e) {
+            std::cerr << "Cannot read path: " << e.what() << "\n";
+            return 0;
+        }
+        node.id = iterator_to_id(node.path,cache);
         node.scan_id = scan_id;
-        node.is_dir = fs::is_directory(node.path);
+        node.is_dir = entry.is_directory();
         if(!node.is_dir){
             try{
-            node.hash = hasher.compute_hash(node.path);
-            node.size = fs::file_size(node.path);
+                node.size = entry.file_size();
             }catch(const fs::filesystem_error& e){
                 std::cerr <<" Cannot read file_size: " << e.what() << "\n";
                 return 0;
             }
         }
         try{
-            auto ftime = fs::last_write_time(node.path);
+            auto ftime = entry.last_write_time();
             node.mtm = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(ftime));
         }catch(const fs::filesystem_error& e){
             std::cerr << node.path <<" Cannot read mtm: " << e.what() << "\n";
@@ -76,8 +83,38 @@ int versioneer::fill_node(tree_node& node, std::string path, int scan_id, int pa
         return 1;
     }
 
+void versioneer::build_Mtree(std::vector<tree_node>& tree){
+    std::reverse(tree.begin(),tree.end()); //reversing search path made by BFS
+    std::unordered_map<int,std::string> hash_cache;
+    for(tree_node& n: tree){
+        if(!n.is_dir){
+            hash_cache[n.parent_id] += n.hash;  //acumulate file hashes
+            continue;
+        }
+        auto it = hash_cache.find(n.id);
+        if(it != hash_cache.end()) {
+            std::string hash = hasher.hash_string(it->second);  //hash non empty dirs
+            if(n.hash != hash){
+                n.hash = hash;
+                dbm.update_hash(n);
+            }
+            hash_cache[n.parent_id] += n.hash;
+        }else{
+            std::string hash = hasher.hash_string(n.path); //hash empty dirs
+            if(n.hash != hash){
+                n.hash = hash;
+                dbm.update_hash(n);
+            }
+            hash_cache[n.parent_id] += n.hash;
+        }
+    }
+}
+
 void versioneer::check_file(tree_node& node,std::unordered_map<int,int>& changes){
     if(node.id == -1){
+        if(!node.is_dir){
+            node.hash = hasher.hash_file(node.path);
+        }
         dbm.step_insert(node); //adds new node if node wasnt found
         changes.insert({node.id,ADDED});
     }else{
@@ -102,7 +139,17 @@ void versioneer::get_filesystem_changes(){
 
         //INTIALIZATION OF ROOT NODE
         tree_node start;
-        fill_node(start,backup_root,scan_id,0,iterator_to_id(backup_root,cache));
+        start.path = backup_root;
+        start.id = iterator_to_id(start.path,cache);
+        start.scan_id = scan_id;
+        start.parent_id = 0;
+        start.is_dir = fs::is_directory(start.path);
+        auto ftime = fs::last_write_time(start.path);
+        start.mtm = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(ftime));
+        if(!start.is_dir){
+            start.size = fs::file_size(start.path);
+        }
+        
         check_file(start,changes);
             
         file_tree.push_back(start);
@@ -117,18 +164,12 @@ void versioneer::get_filesystem_changes(){
                     }
                 //BEGIN NODE FILLING LOGIC//
                 std::string path;
-                try {                                                                   //Exists just because sometimes especially when browsing windows appdata this throws sys error.
-                    path = entry.path().generic_string();
-                    if (skip_dirs.contains(entry.path().filename().string())) continue; //Also nice to have if we have some folders we dont want to back-up
-                }
-                catch (const std::system_error& e) {
-                    std::cerr << "Cannot read path: " << e.what() << "\n";
-                    continue;
-                }
                 tree_node node;
-                if(!fill_node(node,path,scan_id,file_que.front().id,iterator_to_id(path,cache))){
+                if(!fill_node(node,scan_id,file_que.front().id,cache,entry)){
+                    std::cout<<"Unable to backup file: "<<path<<std::endl;
                     continue;
                 };
+                sz+=node.size;
                 //END NODE FILLING LOGIC//
                 check_file(node,changes);
                 if(node.is_dir){
@@ -141,11 +182,14 @@ void versioneer::get_filesystem_changes(){
         }
         dbm.get_removed(changes,scan_id);
 
-        //std::cout <<"\n\n" << file_tree.size() << "\n\n" << sz <<"\n\n" << std::endl;
-        for (int i = 0; i < file_tree.size(); i++) {
-              print_node(file_tree[i]);
-        }
-        print_changes(changes);
+        build_Mtree(file_tree);
+        //for (int i = 0; i < file_tree.size(); i++) {
+        //    print_node(file_tree[i]);
+        //}
+
+        //print_changes(changes);
+        //std::cout<<"Tree size: "<< sz <<"B" << std::endl;
+        //std::cout<<"Root hash: "<< file_tree.back().hash<< std::endl;
 
         dbm.commit_transaction();
     }

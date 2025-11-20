@@ -22,19 +22,25 @@ target_compile_definitions( blake3lib PRIVATE
 )
 target_include_directories(blake3lib PUBLIC third_party/blake3)
 
+add_library(hasher
+    src/hasher.cpp
+)
+target_link_libraries(hasher PUBLIC blake3lib)
+target_include_directories(hasher PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
 # DBManager library
 add_library(dbmanager
     src/db_manager.cpp
 )
 target_link_libraries(dbmanager PRIVATE SQLite::SQLite3)
+target_link_libraries(dbmanager PUBLIC hasher)
 target_include_directories(dbmanager PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # Versioneer depends on DBManager
 add_library(versioneer
-    src/hasher.cpp
     src/versioneer.cpp
 )
-target_link_libraries(versioneer PRIVATE dbmanager PUBLIC blake3lib)
+target_link_libraries(versioneer PRIVATE dbmanager PUBLIC hasher)
 target_include_directories(versioneer PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # Main executable

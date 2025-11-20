@@ -2,8 +2,8 @@
 #include "hasher.hpp"
 #include <unordered_set>
 #include <unordered_map>
+#include <algorithm>
 #include <filesystem>
-#include <vector>
 #include <queue>
 
 namespace fs = std::filesystem;
@@ -21,9 +21,11 @@ private:
 
     int iterator_to_id(std::string path,std::unordered_map<std::string,int>& cache);
 
-    int fill_node(tree_node& node, std::string path, int scan_id, int parent_id, int id);
+    int fill_node(tree_node& node, int scan_id, int parent_id,std::unordered_map<std::string,int>& cache, auto& entry);
 
     void check_file(tree_node& node,std::unordered_map<int,int>& changes);
+
+    void build_Mtree(std::vector<tree_node>& tree);
 
 public:
 

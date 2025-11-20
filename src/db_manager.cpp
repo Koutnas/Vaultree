@@ -19,6 +19,7 @@ db_manager::db_manager(){
         std::cerr << "SQL error: " << err << std::endl;
         sqlite3_free(err);
     }
+    //PREPEARED STATEMENTS USED FOR FILE ENUMERATION AND BUILDING OF MERKLE TREE
     const char* insertf =R"(INSERT INTO files (parent_id,path,is_dir,size,mtm,hash,scan_id) VALUES (?,?,?,?,?,?,?))";
     sqlite3_prepare_v2(db, insertf, -1, &stmts.insertf, nullptr);
     const char* select =R"(SELECT size,mtm,hash FROM files WHERE id=?)";
@@ -28,9 +29,19 @@ db_manager::db_manager(){
     const char* update_scan =R"(UPDATE files SET scan_id=? WHERE id=?)";
     sqlite3_prepare_v2(db, update_scan, -1, &stmts.update_scan, nullptr);
     const char* update_minor = R"(UPDATE files SET mtm=?,size=?,scan_id=? WHERE id=?)";
-    sqlite3_prepare_v2(db, update_minor, -1, &stmts.upadte_minor,nullptr);
+    sqlite3_prepare_v2(db, update_minor, -1, &stmts.update_minor,nullptr);
+    const char* update_hash = R"(UPDATE files SET hash=? WHERE id=?)";
+    sqlite3_prepare_v2(db, update_hash, -1, &stmts.update_hash,nullptr);
 }
 db_manager::~db_manager(){
+    sqlite3_finalize(stmts.update_scan);
+    sqlite3_finalize(stmts.update);
+    sqlite3_finalize(stmts.select);
+    sqlite3_finalize(stmts.insertf);
+    sqlite3_finalize(stmts.update_minor);
+    sqlite3_finalize(stmts.update_hash);
+
+
     if(db){
         sqlite3_close(db);
         db = nullptr;
@@ -64,10 +75,6 @@ void db_manager::start_transaction(){
 }
 
 void db_manager::commit_transaction(){
-    sqlite3_finalize(stmts.update_scan);
-    sqlite3_finalize(stmts.update);
-    sqlite3_finalize(stmts.select);
-    sqlite3_finalize(stmts.insertf);
     sqlite3_exec(db, "COMMIT;", nullptr, nullptr, nullptr);
 }
 
@@ -96,6 +103,13 @@ void db_manager::step_insert(tree_node& node){
     node.id = static_cast<int>(sqlite3_last_insert_rowid(db));
     sqlite3_reset(stmts.insertf);
 }
+void db_manager::update_hash(tree_node& node){
+    sqlite3_bind_text(stmts.update_hash, 1, node.hash.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmts.update_hash,2,node.id);
+    sqlite3_step(stmts.update_hash);
+    sqlite3_reset(stmts.update_hash);
+}
+
 void db_manager::update_scan_id(tree_node& node){
     sqlite3_bind_int(stmts.update_scan,1,node.scan_id);
     sqlite3_bind_int(stmts.update_scan,2,node.id);
@@ -105,13 +119,13 @@ void db_manager::update_scan_id(tree_node& node){
 }
 
 void db_manager::update_mtm_size(tree_node& node){
-    sqlite3_bind_int64(stmts.upadte_minor,1,node.mtm);
-    sqlite3_bind_int(stmts.upadte_minor,2,node.size);
-    sqlite3_bind_int(stmts.upadte_minor,3,node.scan_id);
-    sqlite3_bind_int(stmts.upadte_minor,4,node.id);
+    sqlite3_bind_int64(stmts.update_minor,1,node.mtm);
+    sqlite3_bind_int(stmts.update_minor,2,node.size);
+    sqlite3_bind_int(stmts.update_minor,3,node.scan_id);
+    sqlite3_bind_int(stmts.update_minor,4,node.id);
 
-    sqlite3_step(stmts.upadte_minor);
-    sqlite3_reset(stmts.upadte_minor);
+    sqlite3_step(stmts.update_minor);
+    sqlite3_reset(stmts.update_minor);
 }
 
 void db_manager::update_all(tree_node& node){
@@ -134,10 +148,20 @@ int db_manager::compare_metadata(tree_node& node){
         time_t mtm = sqlite3_column_int64(stmts.select,1);
         std::string hash = reinterpret_cast<const char*>(sqlite3_column_text(stmts.select, 2));
 
+        if(node.is_dir){
+            node.hash = hash;   //Adding hash from db since it cannot be callculated without going through the files -- might be logicaly inconsistent - fix for now.
+        }
+
         if(node.mtm == mtm && node.size == size){ //File unmodified
+            node.hash = hash;
             update_scan_id(node);
             return 0;
-        }else if (node.hash == hash){ //File modified but hash checksout - unomodified
+        }
+        if(!node.is_dir){
+            node.hash = hasher.hash_file(node.path);
+        }
+        
+        if (node.hash == hash && !node.is_dir){ //File modified but hash checksout - unomodified
             update_mtm_size(node);
             return 0;
         }else{

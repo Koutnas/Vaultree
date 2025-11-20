@@ -1,3 +1,4 @@
+#include "hasher.hpp"
 #include <iostream>
 #include <sqlite3.h>
 #include <unordered_map>
@@ -23,13 +24,16 @@ struct tree_node {
 class db_manager{
 private:
     sqlite3* db;
+    Hasher hasher;
+    
 public:
     struct Prepared {
     sqlite3_stmt* insertf = nullptr;
     sqlite3_stmt* select = nullptr;
     sqlite3_stmt* update = nullptr;
     sqlite3_stmt* update_scan = nullptr;
-    sqlite3_stmt* upadte_minor = nullptr;
+    sqlite3_stmt* update_minor = nullptr;
+    sqlite3_stmt* update_hash = nullptr;
     } stmts;
 
     db_manager();
@@ -43,6 +47,8 @@ public:
     void commit_transaction();
 
     void get_removed(std::unordered_map<int,int>& changes,int scan_id);
+
+    void update_hash(tree_node& node);
 
     void update_scan_id(tree_node& node);
 
