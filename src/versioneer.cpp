@@ -109,6 +109,36 @@ void versioneer::build_Mtree(std::vector<tree_node>& tree){
         }
     }
 }
+void versioneer::mt_new_file(tree_node node, std::unordered_map<int,int>& changes,std::vector<tree_node>& tree,std::mutex& mutex){
+    if(!node.is_dir){
+        node.hash = hasher.hash_file(node.path);
+    }
+    std::lock_guard<std::mutex> lock(mutex);
+        
+        changes.insert({node.id,ADDED});
+        tree.push_back(node);
+        dbm.step_insert(node);
+
+}
+void versioneer::mt_existing_file(tree_node node, std::unordered_map<int,int>& changes,std::vector<tree_node>& tree,std::mutex& mutex){
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+
+            if(dbm.check_mtm_size(node)==0){
+                tree.push_back(node);
+                return;
+            }
+            std::string hash;
+    }
+    if(!node.is_dir){
+        node.hash = hasher.hash_file(node.path);
+    }
+    std::lock_guard<std::mutex> lock(mutex);
+        dbm.update_all(node);
+        changes.insert({node.id,MODIFIED});
+        tree.push_back(node);
+}
+
 
 void versioneer::check_file(tree_node& node,std::unordered_map<int,int>& changes){
     if(node.id == -1){
@@ -171,12 +201,16 @@ void versioneer::get_filesystem_changes(){
                 };
                 sz+=node.size;
                 //END NODE FILLING LOGIC//
+
+                //BEGIN MULTI THREAD LOGIC//
+
+                
+                //END MULTI THREAD LOGIC//
                 check_file(node,changes);
                 if(node.is_dir){
                     file_que.push(node);
                 }
-                file_tree.push_back(node);
-                }
+            }
 
             file_que.pop();
         }

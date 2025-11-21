@@ -58,7 +58,9 @@ public:
 
     void step_insert(tree_node& node);
 
-    int compare_metadata(tree_node& node);
+    int compare_metadata(tree_node& node);  //will be made obsolete
+
+    int check_mtm_size(tree_node& node);
 
     int get_scan_id();
 };

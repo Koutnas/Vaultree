@@ -171,6 +171,22 @@ int db_manager::compare_metadata(tree_node& node){
     }
     return -1;
 }
+int db_manager::check_mtm_size(tree_node& node){
+    sqlite3_reset(stmts.select);
+    sqlite3_bind_int(stmts.select,1,node.id);
+
+    if(sqlite3_step(stmts.select) == SQLITE_ROW){
+        int size = sqlite3_column_int(stmts.select,0);
+        time_t mtm = sqlite3_column_int64(stmts.select,1);
+        std::string hash = reinterpret_cast<const char*>(sqlite3_column_text(stmts.select, 2));
+
+        if(node.mtm == mtm && node.size == size){
+            return 0;
+        }else{
+            return 1;
+        }
+    }
+}
 
 int db_manager::get_scan_id(){
     sqlite3_stmt* stmt;
