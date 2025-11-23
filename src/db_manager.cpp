@@ -142,30 +142,17 @@ void db_manager::update_all(tree_node& node){
 int db_manager::compare_metadata(tree_node& node){
     sqlite3_reset(stmts.select);
     sqlite3_bind_int(stmts.select,1,node.id);
-
     if(sqlite3_step(stmts.select) == SQLITE_ROW){
         int size = sqlite3_column_int(stmts.select,0);
         time_t mtm = sqlite3_column_int64(stmts.select,1);
         std::string hash = reinterpret_cast<const char*>(sqlite3_column_text(stmts.select, 2));
-
-        if(node.is_dir){
-            node.hash = hash;   //Adding hash from db since it cannot be callculated without going through the files -- might be logicaly inconsistent - fix for now.
-        }
-
         if(node.mtm == mtm && node.size == size){ //File unmodified
             node.hash = hash;
             update_scan_id(node);
             return 0;
-        }
-        if(!node.is_dir){
-            node.hash = hasher.hash_file(node.path);
-        }
-        
-        if (node.hash == hash && !node.is_dir){ //File modified but hash checksout - unomodified
-            update_mtm_size(node);
-            return 0;
         }else{
-            update_all(node);
+            node.hash = hash;
+            update_mtm_size(node);
             return 1;
         }
     }
@@ -179,6 +166,9 @@ int db_manager::check_mtm_size(tree_node& node){
         int size = sqlite3_column_int(stmts.select,0);
         time_t mtm = sqlite3_column_int64(stmts.select,1);
         std::string hash = reinterpret_cast<const char*>(sqlite3_column_text(stmts.select, 2));
+        if(!node.is_dir){
+            node.hash = hash;
+        }
 
         if(node.mtm == mtm && node.size == size){
             return 0;
