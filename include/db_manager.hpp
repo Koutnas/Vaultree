@@ -1,4 +1,3 @@
-#include "hasher.hpp"
 #include <iostream>
 #include <sqlite3.h>
 #include <unordered_map>
@@ -24,7 +23,6 @@ struct tree_node {
 class db_manager{
 private:
     sqlite3* db;
-    Hasher hasher;
     
 public:
     struct Prepared {

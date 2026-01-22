@@ -60,7 +60,7 @@ int versioneer::fill_node(tree_node& node, int scan_id, int parent_id, std::unor
             } //Also nice to have if we have some folders we dont want to back-up
         } catch (const std::system_error& e) {
             std::cerr << "Cannot read path: " << e.what() << "\n";
-            return 0;
+            return 0; //Implement feature that stores what file we skipped
         }
         node.id = iterator_to_id(node.path,cache);
         node.scan_id = scan_id;
@@ -117,86 +117,13 @@ void versioneer::build_Mtree(std::vector<tree_node>& tree){
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout <<"Time spent in merkle tree: "<< elapsed.count() << '\n';
 }
-void versioneer::manage_threads(){
-    //Throtling logic
-    while(futures.size() >= max_threads){
-        bool slot = false;
-        for (auto it = futures.begin(); it != futures.end(); ) {
-            // wait_for(0s) checks status instantly without blocking
-            if (it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            it->get(); // Sync / check for errors
-            it = futures.erase(it); // Remove from list, returns iterator to next item
-            slot=true;
-            } else {
-                ++it; // This thread is still busy, move to next
-            }
-        }
-
-        if(!slot && futures.size() >= max_threads){
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-    }
-
-}
-
-void versioneer::mt_new_file(tree_node node, std::unordered_map<int,int>& changes,std::vector<tree_node>& hashed,std::mutex& mutex){
-    if(!node.is_dir){
-        node.hash = hasher.hash_file(node.path);
-    }
-    std::lock_guard<std::mutex> lock(mutex);
-        if(!node.is_dir){
-            dbm.update_hash(node);
-        }
-        changes.insert({node.id,ADDED});
-        hashed.push_back(node);
-}
-
-void versioneer::mt_existing_file(tree_node node, std::unordered_map<int,int>& changes,std::vector<tree_node>& hashed,std::mutex& mutex){
-    std::string hash = "";
-    if(!node.is_dir){
-        hash = hasher.hash_file(node.path);
-    }
-    std::lock_guard<std::mutex> lock(mutex);
-        if(hash == node.hash){
-            dbm.update_mtm_size(node);
-            hashed.push_back(node);
-        }else{
-            node.hash = hash;
-            if(!node.is_dir){
-                dbm.update_hash(node);
-            }
-            changes.insert({node.id,MODIFIED});
-            hashed.push_back(node);
-        }
-}
 
 void versioneer::hash_files(std::vector<tree_node>& added,std::vector<tree_node>& modified,std::vector<tree_node>& hashed,std::unordered_map<int,int>& changes){
-    tree_node temp;
-    //Processing added files
-    while(!added.empty()){
-        manage_threads();
-        temp = added.back();
-        futures.push_back(std::async(std::launch::async, [this,temp,&changes,&hashed](){
-        this->mt_new_file(temp,changes,hashed,db_mutex);
-        }));
-        added.pop_back();
-    }
-
-    //Processing potentially modified files
-    while(!modified.empty()){
-        manage_threads();
-        temp = modified.back();
-        futures.push_back(std::async(std::launch::async, [this,temp,&changes,&hashed](){
-        this->mt_existing_file(temp,changes,hashed,db_mutex);
-        }));
-        modified.pop_back();
-    }
-    //thread cleanup
-    for(auto& f : futures) {
-    if(f.valid()) f.get(); 
-    }
-    futures.clear(); // Clear the vector so it doesn't hold invalid states
-    return;
+    file_processor fp = file_processor(hasher,dbm);
+    fp.hash_new_files(added);
+    fp.hash_exist_files(modified);
+    hashed = fp.get_hashed();
+    changes = fp.get_changes();
 }
 
 
@@ -246,7 +173,7 @@ void versioneer::file_traversal(std::vector<tree_node>& added,std::vector<tree_n
                 };
             sz+=node.size;
                 check_file(added,modified,finished,node);
-                //END NODE FILLING LOGIC//
+            //END NODE FILLING LOGIC//
             if(node.is_dir){
                 file_que.push(node);
                 }
@@ -281,14 +208,17 @@ void versioneer::get_filesystem_changes(){
 
     std::cout<<"Finished hashing, proceeding to start building merkle tree..."<<std::endl;
     build_Mtree(finished);
+   /*
     std::cout<<"Finished building a merkle tree..."<<std::endl;
-    //for (int i = 0; i < finished.size(); i++) {
-    //    print_node(finished[i]);
-    //}
+    for (int i = 0; i < finished.size(); i++) {
+        print_node(finished[i]);
+    }*/
+
 
     //print_changes(changes);
     std::cout<<"Tree size: "<< sz <<"B" << std::endl;
     std::cout<<"Root hash: "<< finished.back().hash<< std::endl;
+
 
     dbm.commit_transaction();
     }

@@ -176,6 +176,7 @@ int db_manager::check_mtm_size(tree_node& node){
             return 1;
         }
     }
+    return -1; //Fix later
 }
 
 int db_manager::get_scan_id(){

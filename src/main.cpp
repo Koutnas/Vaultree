@@ -3,7 +3,7 @@
 int main(){       
         auto start = std::chrono::system_clock::now();
 
-        versioneer vers = versioneer("/home/ondra/test");
+        versioneer vers = versioneer("/home/ondra/");
         vers.get_filesystem_changes();
 
         auto end = std::chrono::system_clock::now();
