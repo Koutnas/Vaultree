@@ -23,16 +23,25 @@ struct tree_node {
 class db_manager{
 private:
     sqlite3* db;
-    
-public:
     struct Prepared {
     sqlite3_stmt* insertf = nullptr;
     sqlite3_stmt* select = nullptr;
-    sqlite3_stmt* update = nullptr;
     sqlite3_stmt* update_scan = nullptr;
     sqlite3_stmt* update_minor = nullptr;
-    sqlite3_stmt* update_hash = nullptr;
+    sqlite3_stmt* add_blob_ref = nullptr;
+    sqlite3_stmt* subtract_blob_ref = nullptr;
+    sqlite3_stmt* check_exists = nullptr;
+    sqlite3_stmt* insert_blob = nullptr;
+    sqlite3_stmt* update_file_ref = nullptr;
+    sqlite3_stmt* get_file_ref = nullptr;
     } stmts;
+    
+    int check_hash_exists(std::string hash);
+
+    void update_hash_ref(int id_blob,int id_file);
+
+    int get_blob_id(int id_blob);
+public:
 
     db_manager();
 
@@ -52,13 +61,16 @@ public:
 
     void update_mtm_size(tree_node& node);
 
-    void update_all(tree_node& node);
-
     void step_insert(tree_node& node);
+
+    void clean_blobs();
 
     int compare_metadata(tree_node& node);  //will be made obsolete
 
     int check_mtm_size(tree_node& node);
 
     int get_scan_id();
+
+    
+
 };

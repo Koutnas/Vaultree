@@ -122,6 +122,7 @@ void versioneer::hash_files(std::vector<tree_node>& added,std::vector<tree_node>
     file_processor fp = file_processor(hasher,dbm);
     fp.hash_new_files(added);
     fp.hash_exist_files(modified);
+    fp.pool.wait_all();
     hashed = fp.get_hashed();
     changes = fp.get_changes();
 }
@@ -172,8 +173,11 @@ void versioneer::file_traversal(std::vector<tree_node>& added,std::vector<tree_n
                 continue;
                 };
             sz+=node.size;
-                check_file(added,modified,finished,node);
+            std::cout<<"//////////////////////////////////"<<std::endl;
+            print_node(node);
+            check_file(added,modified,finished,node);
             //END NODE FILLING LOGIC//
+            print_node(node);
             if(node.is_dir){
                 file_que.push(node);
                 }
@@ -208,16 +212,19 @@ void versioneer::get_filesystem_changes(){
 
     std::cout<<"Finished hashing, proceeding to start building merkle tree..."<<std::endl;
     build_Mtree(finished);
-   /*
+   
     std::cout<<"Finished building a merkle tree..."<<std::endl;
+    /*
     for (int i = 0; i < finished.size(); i++) {
         print_node(finished[i]);
-    }*/
+    }
+    */
 
 
-    //print_changes(changes);
+    print_changes(changes);
     std::cout<<"Tree size: "<< sz <<"B" << std::endl;
     std::cout<<"Root hash: "<< finished.back().hash<< std::endl;
+    dbm.clean_blobs();
 
 
     dbm.commit_transaction();

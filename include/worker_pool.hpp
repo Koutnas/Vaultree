@@ -8,11 +8,11 @@ class worker_pool{
         std::vector<std::future<void>> futures;
 
         void throttle_threads();
-
-        void wait_all();
         
     public:
         void submit(std::function<void()> task);
+
+        void wait_all();
 
         ~worker_pool();
     };

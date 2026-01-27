@@ -14,13 +14,13 @@ class file_processor{
         std::mutex db_mutex;
         std::vector<tree_node> hashed;
         std::unordered_map<int,int> changes;
-        worker_pool pool;
 
         void process_existing(tree_node node);
 
         void process_new(tree_node node);
 
     public:
+        worker_pool pool;
         file_processor(Hasher& hasher,db_manager& dbm);
 
         void hash_new_files(std::vector<tree_node>& added);
