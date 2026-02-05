@@ -1,14 +1,16 @@
 #include "file_processor.hpp"
 
-file_processor::file_processor(Hasher& h, db_manager& d)
-    : hasher(h),dbm(d){}
+file_processor::file_processor(Hasher& h, db_manager& d,std::string& root )
+    : hasher(h),dbm(d){
+        this->root = root;
+    }
 
 
 
 void file_processor::process_existing(tree_node node){
     std::string hash = "";
     if(!node.is_dir){
-        hash = hasher.hash_file(node.path);
+        hash = hasher.hash_file(root+node.path);
     }
     std::lock_guard<std::mutex> lock(db_mutex);
         if(hash == node.hash){
@@ -25,7 +27,7 @@ void file_processor::process_existing(tree_node node){
 
 void file_processor::process_new(tree_node node){
     if(!node.is_dir){
-        node.hash = hasher.hash_file(node.path);
+        node.hash = hasher.hash_file(root+node.path);
     }
     std::lock_guard<std::mutex> lock(db_mutex);
         if(!node.is_dir){

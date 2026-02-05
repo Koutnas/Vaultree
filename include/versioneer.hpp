@@ -12,6 +12,7 @@ private:
     Hasher hasher;
     db_manager dbm = db_manager(SCAN);
     std::string backup_root;
+    int root_size; //Used to store only relative paths
     std::unordered_set<std::string> skip_dirs;
 
     void print_changes(std::unordered_map<int,int>& changes);

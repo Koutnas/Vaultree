@@ -9,6 +9,7 @@ class file_processor{
         //Dependencies
         Hasher& hasher;
         db_manager& dbm;
+        std::string root;
 
         //Class owned
         std::mutex db_mutex;
@@ -21,7 +22,7 @@ class file_processor{
 
     public:
         worker_pool pool;
-        file_processor(Hasher& hasher,db_manager& dbm);
+        file_processor(Hasher& hasher,db_manager& dbm,std::string& root);
 
         void hash_new_files(std::vector<tree_node>& added);
 
