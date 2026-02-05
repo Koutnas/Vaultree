@@ -1,12 +1,21 @@
+#pragma once
+
 #include <iostream>
 #include <sqlite3.h>
 #include <unordered_map>
+#include <unordered_set>
+#include <filesystem>
 
 
 enum status{
     ADDED = 1,
     MODIFIED,
     REMOVED
+};
+
+enum mode{ //Decides which ptsm will be prepeared
+    SCAN = 1,
+    DIR,
 };
 
 struct tree_node {
@@ -23,18 +32,26 @@ struct tree_node {
 class db_manager{
 private:
     sqlite3* db;
-    struct Prepared {
-    sqlite3_stmt* insertf = nullptr;
-    sqlite3_stmt* select = nullptr;
-    sqlite3_stmt* update_scan = nullptr;
-    sqlite3_stmt* update_minor = nullptr;
-    sqlite3_stmt* add_blob_ref = nullptr;
-    sqlite3_stmt* subtract_blob_ref = nullptr;
-    sqlite3_stmt* check_exists = nullptr;
-    sqlite3_stmt* insert_blob = nullptr;
-    sqlite3_stmt* update_file_ref = nullptr;
-    sqlite3_stmt* get_file_ref = nullptr;
-    } stmts;
+    int mode;
+
+    struct prepared_scan {
+        sqlite3_stmt* insertf = nullptr;
+        sqlite3_stmt* select = nullptr;
+        sqlite3_stmt* update_scan = nullptr;
+        sqlite3_stmt* update_minor = nullptr;
+        sqlite3_stmt* add_blob_ref = nullptr;
+        sqlite3_stmt* subtract_blob_ref = nullptr;
+        sqlite3_stmt* check_exists = nullptr;
+        sqlite3_stmt* insert_blob = nullptr;
+        sqlite3_stmt* update_file_ref = nullptr;
+        sqlite3_stmt* get_file_ref = nullptr;
+    } stmts_scan;
+
+    struct prepared_dir {
+
+    } stmts_dir;
+
+
     
     int check_hash_exists(std::string hash);
 
@@ -48,11 +65,15 @@ private:
 
 public:
 
-    db_manager();
+    db_manager(int mode);
 
     ~db_manager();
 
     std::unordered_map<std::string,int> get_index_map(int scan_id);
+
+    void get_object_hashes(std::unordered_set<std::string>& objects);
+
+    void get_redundant_hashes(std::unordered_set<std::string>& objects);
 
     void start_transaction();
 

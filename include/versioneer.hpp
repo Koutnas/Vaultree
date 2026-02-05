@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <algorithm>
 #include <future>
-#include <filesystem>
 #include <queue>
 
 namespace fs = std::filesystem;
@@ -11,7 +10,7 @@ namespace fs = std::filesystem;
 class versioneer{
 private:
     Hasher hasher;
-    db_manager dbm = db_manager();
+    db_manager dbm = db_manager(SCAN);
     std::string backup_root;
     std::unordered_set<std::string> skip_dirs;
 

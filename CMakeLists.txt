@@ -40,7 +40,12 @@ add_library(workerpool
     src/worker_pool.cpp
 )
 target_include_directories(workerpool PUBLIC ${CMAKE_SOURCE_DIR}/include)
-
+# dir_manager
+add_library(dirmanager
+    src/dir_manager.cpp
+)
+target_link_libraries(dirmanager PRIVATE dbmanager)
+target_include_directories(dirmanager PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # file_processor
 add_library(fileprocessor
@@ -60,4 +65,4 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(vaultree
     src/main.cpp
 )
-target_link_libraries(vaultree PRIVATE versioneer)
+target_link_libraries(vaultree PRIVATE versioneer PRIVATE dirmanager)

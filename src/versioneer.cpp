@@ -227,7 +227,6 @@ void versioneer::get_filesystem_changes(){
     //print_changes(changes);
     std::cout<<"Tree size: "<< sz <<"B" << std::endl;
     std::cout<<"Root hash: "<< finished.back().hash<< std::endl;
-    dbm.clean_blobs();
     dbm.write_changes(changes);
     dbm.commit_transaction();
     }
