@@ -33,14 +33,31 @@ add_library(dbmanager
     src/db_manager.cpp
 )
 target_link_libraries(dbmanager PRIVATE SQLite::SQLite3)
-target_link_libraries(dbmanager PUBLIC hasher)
 target_include_directories(dbmanager PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
+#worker_pool
+add_library(workerpool
+    src/worker_pool.cpp
+)
+target_include_directories(workerpool PUBLIC ${CMAKE_SOURCE_DIR}/include)
+# dir_manager
+add_library(dirmanager
+    src/dir_manager.cpp
+)
+target_link_libraries(dirmanager PRIVATE dbmanager)
+target_include_directories(dirmanager PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+# file_processor
+add_library(fileprocessor
+    src/file_processor.cpp
+)
+target_link_libraries(fileprocessor PRIVATE dbmanager PRIVATE hasher PRIVATE workerpool)
+target_include_directories(fileprocessor PUBLIC ${CMAKE_SOURCE_DIR}/include)
 # Versioneer depends on DBManager
 add_library(versioneer
     src/versioneer.cpp
 )
-target_link_libraries(versioneer PRIVATE dbmanager PUBLIC hasher)
+target_link_libraries(versioneer PRIVATE dbmanager PUBLIC hasher PRIVATE fileprocessor)
 target_include_directories(versioneer PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # Main executable
@@ -48,4 +65,4 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_executable(vaultree
     src/main.cpp
 )
-target_link_libraries(vaultree PRIVATE versioneer)
+target_link_libraries(vaultree PRIVATE versioneer PRIVATE dirmanager)

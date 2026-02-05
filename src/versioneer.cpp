@@ -60,7 +60,7 @@ int versioneer::fill_node(tree_node& node, int scan_id, int parent_id, std::unor
             } //Also nice to have if we have some folders we dont want to back-up
         } catch (const std::system_error& e) {
             std::cerr << "Cannot read path: " << e.what() << "\n";
-            return 0;
+            return 0; //Implement feature that stores what file we skipped
         }
         node.id = iterator_to_id(node.path,cache);
         node.scan_id = scan_id;
@@ -84,7 +84,12 @@ int versioneer::fill_node(tree_node& node, int scan_id, int parent_id, std::unor
     }
 
 void versioneer::build_Mtree(std::vector<tree_node>& tree){
-    std::reverse(tree.begin(),tree.end()); //reversing search path made by BFS
+    auto start = std::chrono::system_clock::now();
+    std::sort(tree.begin(),tree.end(),
+                [](const tree_node& n1,const tree_node& n2){
+                    return n1.path.length()>n2.path.length();
+                });
+    
     std::unordered_map<int,std::string> hash_cache;
     for(tree_node& n: tree){
         if(!n.is_dir){
@@ -93,7 +98,7 @@ void versioneer::build_Mtree(std::vector<tree_node>& tree){
         }
         auto it = hash_cache.find(n.id);
         if(it != hash_cache.end()) {
-            std::string hash = hasher.hash_string(it->second);  //hash non empty dirs
+            std::string hash = hasher.hash_string(it->second);
             if(n.hash != hash){
                 n.hash = hash;
                 dbm.update_hash(n);
@@ -108,88 +113,120 @@ void versioneer::build_Mtree(std::vector<tree_node>& tree){
             hash_cache[n.parent_id] += n.hash;
         }
     }
+    auto end = std::chrono::system_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout <<"Time spent in merkle tree: "<< elapsed.count() << '\n';
 }
 
-void versioneer::check_file(tree_node& node,std::unordered_map<int,int>& changes){
+void versioneer::hash_files(std::vector<tree_node>& added,std::vector<tree_node>& modified,std::vector<tree_node>& hashed,std::unordered_map<int,int>& changes){
+    std::sort(added.begin(), added.end(), [](const tree_node& a, const tree_node& b) {
+        return a.size > b.size; // Process BIG files first
+    });
+    std::sort(modified.begin(), modified.end(), [](const tree_node& a, const tree_node& b) {
+        return a.size > b.size; // Process BIG files first
+    });
+    file_processor fp = file_processor(hasher,dbm);
+    fp.hash_new_files(added);
+    fp.hash_exist_files(modified);
+    fp.pool.wait_all(); //CRUCIAL OTHERWISE MAIN THREAD DOESNT WAIT
+    hashed = fp.get_hashed();
+    changes = fp.get_changes();
+}
+
+
+void versioneer::check_file(std::vector<tree_node>& added,std::vector<tree_node>& modified,std::vector<tree_node>& finished,tree_node& node){
     if(node.id == -1){
-        if(!node.is_dir){
-            node.hash = hasher.hash_file(node.path);
-        }
         dbm.step_insert(node); //adds new node if node wasnt found
-        changes.insert({node.id,ADDED});
+        added.push_back(node);
     }else{
         if(dbm.compare_metadata(node) == 1){
-        changes.insert({node.id,MODIFIED});
-        };
+            modified.push_back(node);
+        }else{
+            finished.push_back(node);
+        }
     }
 }
 
-void versioneer::get_filesystem_changes(){   
-        //DB TRANSACTION BEGINNING
-        int scan_id = dbm.get_scan_id();
-        std::unordered_map<std::string,int> cache = dbm.get_index_map(scan_id);
-        dbm.start_transaction();
-        scan_id += 1;
-
-        //INITIALIZATION OF BFS
-        uint64_t sz = 0;
-        std::queue<tree_node> file_que;
-        std::vector<tree_node> file_tree;
-        std::unordered_map<int,int> changes;
-
-        //INTIALIZATION OF ROOT NODE
-        tree_node start;
-        start.path = backup_root;
-        start.id = iterator_to_id(start.path,cache);
-        start.scan_id = scan_id;
-        start.parent_id = 0;
-        start.is_dir = fs::is_directory(start.path);
-        auto ftime = fs::last_write_time(start.path);
-        start.mtm = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(ftime));
-        if(!start.is_dir){
-            start.size = fs::file_size(start.path);
-        }
+void versioneer::file_traversal(std::vector<tree_node>& added,std::vector<tree_node>& modified,std::vector<tree_node>& finished,std::unordered_map<std::string,int>& cache,uint64_t& sz,int scan_id){
+    std::queue<tree_node> file_que;    
+    tree_node start;
+    start.path = backup_root;
+    start.id = iterator_to_id(start.path,cache);
+    start.scan_id = scan_id;
+    start.parent_id = 0;
+    start.is_dir = fs::is_directory(start.path);
+    auto ftime = fs::last_write_time(start.path);
+    start.mtm = std::chrono::system_clock::to_time_t(std::chrono::file_clock::to_sys(ftime));
+    if(!start.is_dir){
+        start.size = fs::file_size(start.path);
+    }
         
-        check_file(start,changes);
-            
-        file_tree.push_back(start);
-        file_que.push(start);
+    check_file(added,modified,finished,start);
+    file_que.push(start);
 
-        while (!file_que.empty()) {
-            std::error_code ec;
-            for (const auto& entry : fs::directory_iterator(file_que.front().path,ec)) {
-                if (ec) {
-                    std::cerr << "Cannot access /some/path: " << ec.message() << "\n"; //handles permission exceptions file coruption etc... just be careful if you want to backup data owned by root or SYSTEM
-                    continue;
-                    }
-                //BEGIN NODE FILLING LOGIC//
-                std::string path;
-                tree_node node;
-                if(!fill_node(node,scan_id,file_que.front().id,cache,entry)){
-                    std::cout<<"Unable to backup file: "<<path<<std::endl;
-                    continue;
+    while (!file_que.empty()) {
+        std::error_code ec;
+        for (const auto& entry : fs::directory_iterator(file_que.front().path,ec)) {
+            if (ec) {
+                std::cerr << "Cannot access: " << ec.message() << "\n"; //handles permission exceptions file coruption etc... just be careful if you want to backup data owned by root or SYSTEM
+                continue;
+            }
+            //BEGIN NODE FILLING LOGIC//
+            std::string path;
+            tree_node node;
+            if(!fill_node(node,scan_id,file_que.front().id,cache,entry)){
+                std::cout<<"Unable to backup file: "<<path<<std::endl;
+                continue;
                 };
-                sz+=node.size;
-                //END NODE FILLING LOGIC//
-                check_file(node,changes);
-                if(node.is_dir){
-                    file_que.push(node);
+            sz+=node.size;
+            check_file(added,modified,finished,node);
+            //END NODE FILLING LOGIC//
+            if(node.is_dir){
+                file_que.push(node);
                 }
-                file_tree.push_back(node);
-                }
+            }
 
-            file_que.pop();
-        }
-        dbm.get_removed(changes,scan_id);
+        file_que.pop();
+    }
 
-        build_Mtree(file_tree);
-        //for (int i = 0; i < file_tree.size(); i++) {
-        //    print_node(file_tree[i]);
-        //}
+}
 
-        //print_changes(changes);
-        //std::cout<<"Tree size: "<< sz <<"B" << std::endl;
-        //std::cout<<"Root hash: "<< file_tree.back().hash<< std::endl;
+void versioneer::get_filesystem_changes(){   
+    //DB TRANSACTION BEGINNING
+    int scan_id = dbm.get_scan_id();
+    std::unordered_map<std::string,int> cache = dbm.get_index_map(scan_id);
+    dbm.start_transaction();
+    scan_id += 1;
 
-        dbm.commit_transaction();
+    //INITIALIZATION OF BFS
+    uint64_t sz = 0;
+    std::vector<tree_node> finished;
+    std::vector<tree_node> added;
+    std::vector<tree_node> modified;
+    std::vector<tree_node> hashed;
+    std::unordered_map<int,int> changes;
+
+    file_traversal(added,modified,finished,cache,sz,scan_id);
+    std::cout<<"Finished traversing file system, proceeding to start hasing..."<<std::endl;
+    
+    hash_files(added,modified,hashed,changes);
+    finished.insert(finished.end(),hashed.begin(),hashed.end()); //Merging two vectors after we are done with them
+    dbm.get_removed(changes,scan_id);
+
+    std::cout<<"Finished hashing, proceeding to start building merkle tree..."<<std::endl;
+    build_Mtree(finished);
+   
+    std::cout<<"Finished building a merkle tree..."<<std::endl;
+    /*
+    for (int i = 0; i < finished.size(); i++) {
+        print_node(finished[i]);
+    }
+    */
+
+
+    //print_changes(changes);
+    std::cout<<"Tree size: "<< sz <<"B" << std::endl;
+    std::cout<<"Root hash: "<< finished.back().hash<< std::endl;
+    dbm.write_changes(changes);
+    dbm.commit_transaction();
     }
