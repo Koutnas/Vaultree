@@ -15,6 +15,11 @@ const char* db_schema = R"( CREATE TABLE IF NOT EXISTS blobs (
                             scan_id INTEGER,
                             id_blob INTEGER,
                             FOREIGN KEY(id_blob) REFERENCES blobs(id_blob)
+                            );
+                            CREATE TABLE IF NOT EXISTS changes (
+                            id_file INTEGER,
+                            change_type INTEGER,
+                            FOREIGN KEY(id_file) REFERENCES files(id_file)
                             );)";
 
 const char* insert = R"(INSERT INTO files(parent_id,path,is_dir,size,mtm,scan_id) VALUES (?,?,?,?,?,?))";

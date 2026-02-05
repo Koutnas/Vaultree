@@ -12,7 +12,6 @@ void file_processor::process_existing(tree_node node){
     }
     std::lock_guard<std::mutex> lock(db_mutex);
         if(hash == node.hash){
-            //might not be necessary
             hashed.push_back(node);
         }else{
             node.hash = hash;
@@ -32,7 +31,7 @@ void file_processor::process_new(tree_node node){
         if(!node.is_dir){
             dbm.update_hash(node);
         }
-        changes.insert({node.id,ADDED}); //1,3,2,4,5,7,10,6,9,8,11
+        changes.insert({node.id,ADDED});
         hashed.push_back(node);
 }
 

@@ -4,7 +4,7 @@
 
 
 enum status{
-    ADDED = 0,
+    ADDED = 1,
     MODIFIED,
     REMOVED
 };
@@ -41,6 +41,11 @@ private:
     void update_hash_ref(int id_blob,int id_file);
 
     int get_blob_id(int id_blob);
+
+    void insert_change(int id,int change_type);
+
+    void delete_changes();
+
 public:
 
     db_manager();
@@ -64,6 +69,8 @@ public:
     void step_insert(tree_node& node);
 
     void clean_blobs();
+
+    void write_changes(std::unordered_map<int,int>& changes);
 
     int compare_metadata(tree_node& node);  //will be made obsolete
 

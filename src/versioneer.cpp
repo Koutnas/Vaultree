@@ -119,10 +119,16 @@ void versioneer::build_Mtree(std::vector<tree_node>& tree){
 }
 
 void versioneer::hash_files(std::vector<tree_node>& added,std::vector<tree_node>& modified,std::vector<tree_node>& hashed,std::unordered_map<int,int>& changes){
+    std::sort(added.begin(), added.end(), [](const tree_node& a, const tree_node& b) {
+        return a.size > b.size; // Process BIG files first
+    });
+    std::sort(modified.begin(), modified.end(), [](const tree_node& a, const tree_node& b) {
+        return a.size > b.size; // Process BIG files first
+    });
     file_processor fp = file_processor(hasher,dbm);
     fp.hash_new_files(added);
     fp.hash_exist_files(modified);
-    fp.pool.wait_all();
+    fp.pool.wait_all(); //CRUCIAL OTHERWISE MAIN THREAD DOESNT WAIT
     hashed = fp.get_hashed();
     changes = fp.get_changes();
 }
@@ -173,11 +179,8 @@ void versioneer::file_traversal(std::vector<tree_node>& added,std::vector<tree_n
                 continue;
                 };
             sz+=node.size;
-            std::cout<<"//////////////////////////////////"<<std::endl;
-            print_node(node);
             check_file(added,modified,finished,node);
             //END NODE FILLING LOGIC//
-            print_node(node);
             if(node.is_dir){
                 file_que.push(node);
                 }
@@ -221,11 +224,10 @@ void versioneer::get_filesystem_changes(){
     */
 
 
-    print_changes(changes);
+    //print_changes(changes);
     std::cout<<"Tree size: "<< sz <<"B" << std::endl;
     std::cout<<"Root hash: "<< finished.back().hash<< std::endl;
     dbm.clean_blobs();
-
-
+    dbm.write_changes(changes);
     dbm.commit_transaction();
     }

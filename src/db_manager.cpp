@@ -246,8 +246,30 @@ void db_manager::clean_blobs(){
     sqlite3_finalize(stmt);
 }
 
+void db_manager::write_changes(std::unordered_map<int,int>& changes){
+    delete_changes();
+    sqlite3_stmt* stmt;
+    const char* sql = R"(INSERT INTO changes(id_file,change_type) VALUES (?,?))";
+    sqlite3_prepare_v2(db,sql,-1,&stmt,nullptr);
+
+    for(auto change : changes){
+        sqlite3_bind_int(stmt,1,change.first);
+        sqlite3_bind_int(stmt,2,change.second);
+        sqlite3_step(stmt);
+        sqlite3_reset(stmt);
+    }
+
+    sqlite3_finalize(stmt);
+}
+
+void db_manager::delete_changes(){
+    sqlite3_stmt* stmt;
+    const char* sql = R"(DELETE FROM changes)";
+    sqlite3_prepare_v2(db,sql,-1,&stmt,nullptr);
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+}
+
 /*
 MUST FIX LIST:
-Addition and substraction doesnt work the way its supposed to main suspect are newly added function
-Broken is also detecting adding new files.
 */
