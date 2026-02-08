@@ -2,11 +2,16 @@
 
 
 versioneer::versioneer(std::string backup_root){
+    if (backup_root.back() != '/'){
+        backup_root = backup_root + "/";
+    }
     this->backup_root = backup_root;
+    this->root_size = backup_root.length();
 }
 
 versioneer::versioneer(std::string backup_root,std::unordered_set<std::string> skip_dirs){
     this->backup_root = backup_root;
+    this->root_size = backup_root.length();
     this->skip_dirs = skip_dirs;
 }
 
@@ -54,7 +59,7 @@ int versioneer::iterator_to_id(std::string path,std::unordered_map<std::string,i
 int versioneer::fill_node(tree_node& node, int scan_id, int parent_id, std::unordered_map<std::string,int>& cache, auto& entry){
         node.parent_id = parent_id;
         try {                                                                   //Exists just because sometimes especially when browsing windows appdata this throws sys error.
-            node.path = entry.path().generic_string();
+            node.path = entry.path().generic_string().substr(root_size);
             if (skip_dirs.contains(entry.path().filename().string())){ 
                 return 0;
             } //Also nice to have if we have some folders we dont want to back-up
@@ -125,7 +130,7 @@ void versioneer::hash_files(std::vector<tree_node>& added,std::vector<tree_node>
     std::sort(modified.begin(), modified.end(), [](const tree_node& a, const tree_node& b) {
         return a.size > b.size; // Process BIG files first
     });
-    file_processor fp = file_processor(hasher,dbm);
+    file_processor fp = file_processor(hasher,dbm,backup_root);
     fp.hash_new_files(added);
     fp.hash_exist_files(modified);
     fp.pool.wait_all(); //CRUCIAL OTHERWISE MAIN THREAD DOESNT WAIT
@@ -162,11 +167,12 @@ void versioneer::file_traversal(std::vector<tree_node>& added,std::vector<tree_n
     }
         
     check_file(added,modified,finished,start);
+    start.path = ""; //This ambiguous fuckery is done because the relative path appendage bellow
     file_que.push(start);
 
     while (!file_que.empty()) {
         std::error_code ec;
-        for (const auto& entry : fs::directory_iterator(file_que.front().path,ec)) {
+        for (const auto& entry : fs::directory_iterator(backup_root+file_que.front().path,ec)) {
             if (ec) {
                 std::cerr << "Cannot access: " << ec.message() << "\n"; //handles permission exceptions file coruption etc... just be careful if you want to backup data owned by root or SYSTEM
                 continue;

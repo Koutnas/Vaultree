@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 class dir_manager
 {
 private:
-    db_manager dbm = db_manager(DIR);
+    db_manager dbm = db_manager(0); // Dont load any ptsm
 
     void clean_object_storage();
 public:

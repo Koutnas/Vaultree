@@ -29,7 +29,7 @@ db_manager::db_manager(int mode){
         sqlite3_prepare_v2(db, update_f_ref, -1, &stmts_scan.update_file_ref,nullptr);
         sqlite3_prepare_v2(db, get_f_ref, -1, &stmts_scan.get_file_ref,nullptr);
         break;
-    case DIR:
+    case BACKUP:
 
         break;
     default:
@@ -51,7 +51,7 @@ db_manager::~db_manager(){
         sqlite3_finalize(stmts_scan.update_file_ref);
         sqlite3_finalize(stmts_scan.get_file_ref);
         break;
-    case DIR:
+    case BACKUP:
 
         break;
     default:

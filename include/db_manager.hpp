@@ -15,7 +15,7 @@ enum status{
 
 enum mode{ //Decides which ptsm will be prepeared
     SCAN = 1,
-    DIR,
+    BACKUP,
 };
 
 struct tree_node {

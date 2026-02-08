@@ -13,13 +13,24 @@ add_library(blake3lib
     third_party/blake3/blake3.c
     third_party/blake3/blake3_portable.c
     third_party/blake3/blake3_dispatch.c
+    third_party/blake3/blake3_sse2.c
+    third_party/blake3/blake3_sse41.c
+    third_party/blake3/blake3_avx2.c
+    third_party/blake3/blake3_avx512.c
 )
-target_compile_definitions( blake3lib PRIVATE
-    BLAKE3_NO_SSE2
-    BLAKE3_NO_SSE41
-    BLAKE3_NO_AVX2
-    BLAKE3_NO_AVX512
-)
+if(MSVC)
+    # Windows / MSVC Flags
+    set_source_files_properties(third_party/blake3/blake3_sse2.c PROPERTIES COMPILE_OPTIONS "/arch:SSE2")
+    set_source_files_properties(third_party/blake3/blake3_sse41.c PROPERTIES COMPILE_OPTIONS "/arch:SSE2") # MSVC usually bundles SSE4.1 with SSE2 or AVX
+    set_source_files_properties(third_party/blake3/blake3_avx2.c PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
+    set_source_files_properties(third_party/blake3/blake3_avx512.c PROPERTIES COMPILE_OPTIONS "/arch:AVX512")
+else()
+    # Linux / GCC / Clang Flags
+    set_source_files_properties(third_party/blake3/blake3_sse2.c PROPERTIES COMPILE_OPTIONS "-msse2")
+    set_source_files_properties(third_party/blake3/blake3_sse41.c PROPERTIES COMPILE_OPTIONS "-msse4.1")
+    set_source_files_properties(third_party/blake3/blake3_avx2.c PROPERTIES COMPILE_OPTIONS "-mavx2")
+    set_source_files_properties(third_party/blake3/blake3_avx512.c PROPERTIES COMPILE_OPTIONS "-mavx512f;-mavx512vl")
+endif()
 target_include_directories(blake3lib PUBLIC third_party/blake3)
 
 add_library(hasher
