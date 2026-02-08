@@ -11,6 +11,10 @@ void file_processor::process_existing(tree_node node){
     std::string hash = "";
     if(!node.is_dir){
         hash = hasher.hash_file(root+node.path);
+        if(hash.empty()){
+            std::cout<<"Unable to hash file: "+root+node.path<<std::endl;
+            return;
+        }
     }
     std::lock_guard<std::mutex> lock(db_mutex);
         if(hash == node.hash){
@@ -28,6 +32,10 @@ void file_processor::process_existing(tree_node node){
 void file_processor::process_new(tree_node node){
     if(!node.is_dir){
         node.hash = hasher.hash_file(root+node.path);
+        if(node.hash.empty()){
+            std::cout<<"Unable to hash file: "+root+node.path<<std::endl;
+            return;
+        }
     }
     std::lock_guard<std::mutex> lock(db_mutex);
         if(!node.is_dir){
